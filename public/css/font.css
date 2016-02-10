@@ -1,0 +1,35 @@
+
+@font-face {
+    font-family: 'proxima_novasemibold';
+    src: url('../fonts/proximanova-semibold-webfont.eot');
+    src: url('../fonts/proximanova-semibold-webfont.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/proximanova-semibold-webfont.woff') format('woff'),
+         url('../fonts/proximanova-semibold-webfont.ttf') format('truetype'),
+         url('../fonts/proximanova-semibold-webfont.svg#proxima_novasemibold') format('svg');
+    font-weight: normal;
+   font-style: normal
+}
+@font-face {
+    font-family: 'ubuntuReg';
+    src: url('../fonts/Ubuntu.TTF');
+    src: url('../fonts/Ubuntu.eot');
+    src: url('../fonts/Ubuntu.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/Ubuntu.woff') format('woff'),
+         url('../fonts/Ubuntu.ttf') format('truetype'),
+         url('../fonts/Ubuntu.svg#Ubuntu') format('svg');
+    font-weight: normal;
+    font-style: normal
+}
+@font-face {
+    font-family: 'Ubuntubold';
+    src: url('../fonts/ubuntubold.TTF');
+    src: url('../fonts/ubuntubold.eot');
+    src: url('../fonts/ubuntubold.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/ubuntubold.woff') format('woff'),
+         url('../fonts/ubuntubold.ttf') format('truetype'),
+         url('../fonts/ubuntubold.svg#Ubuntu') format('svg');
+    font-weight: normal;
+    font-style: normal
+
+}
+

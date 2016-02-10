@@ -1,0 +1,229 @@
+<?php
+namespace API;
+use Validator;
+use Request;
+use Response;
+use Groupquestion;use URL;use User;use Userstag;use Usersgroup;use Question;use Tag;Use KarmaHelper;use Karmafeed;use Group;use Karmanote;use Questionwillingtohelp; //Models
+use Illuminate\Support\Facades\DB; //To queries directly
+class QueriesApiController extends \BaseController {
+
+	/**
+	 * Function to show Query Detail and offerHelp users.
+	 *
+	 * @return Response
+	 */
+	public function karmaQueryDetail()
+	{
+		$rules = Validator::make(Request::all(), [
+                    'accessToken' => 'required',
+                    'userId' => 'required',
+                    'queryId' => 'required',
+		]);
+        if ($rules->fails()) {
+            $this->status = 'Validation fails';
+            $this->message = 'arguments missing';
+            
+        } else {
+        	$accessToken = Request::get('accessToken');
+            $userId = Request::get('userId');
+        	$queryId=Request::get('queryId');
+        	$siteUrl=URL::to('/');
+        	$getuser = User::where('id', '=', $userId)->where('site_token','=',$accessToken)->first();
+			if(!empty($getuser)){
+				$getQueryDetails = Question::where('id','=',$queryId)
+										->select(array('user_id as userId','questions.queryStatus','questions.description','questions.skills','questions.question_url'))
+							            ->first();
+				$getQueryHelpCount['countHelp']=Questionwillingtohelp::where('question_id','=',$queryId)->where('user_id','<>',$userId)->count();
+				$getOfferHelpUser = DB::table('users_question_willingtohelp')
+									->join('users', 'users_question_willingtohelp.user_id', '=', 'users.id')
+									->select(array('users.id','users.fname','users.lname','users.piclink','users.headline'))
+						            ->where('users_question_willingtohelp.question_id','=',$queryId)
+						           	->get();					
+					
+				if(!empty($getQueryDetails)){
+					$receiverId=$getQueryDetails->userId;
+					if(!empty($receiverId)){
+						$receiverData=User::where('id','=',$receiverId)->select('fname As receiverFirstName','lname As receiverLastName','piclink As receiverPic','headline As receiverHeadline')->first();	
+					}
+					$tags = explode(',', $getQueryDetails->skills);
+						if(!empty($getQueryDetails->skills)){
+							
+							foreach ($tags as $name) {
+								$skillTag[] = Tag::find($name);
+							}
+						}else{
+							$skillTag=array();
+						}
+						$dynamicGroup=$getQueryDetails->question_url.'/'.$queryId;
+						$queryUrl['publicUrl']=$siteUrl.'/question/'.$dynamicGroup;
+						$karmaQueryFeed = array_merge($getQueryDetails->toArray(),$receiverData->toArray(),$getQueryHelpCount,$queryUrl);
+						$this->status = 'Success';
+						return Response::json(array('status'=>$this->status,
+								'karmaNoteDetail'=>$karmaQueryFeed,
+								'skillTag'=>$skillTag,
+								'offerHelpToUser'=>$getOfferHelpUser
+    					));
+						
+				}else{
+					$this->status = 'failure';
+            		$this->message = 'There is no such karmaQuery exist.';
+				}
+				
+			}else{
+				$this->status = 'failure';
+            	$this->message = 'You are not a login user.';
+			}
+		}
+        return Response::json(array('status'=>$this->status,
+    								'message'=>$this->message,
+    									
+    	));
+		
+	}
+
+	/**
+	 * Function to save Query Detail.
+	 *
+	 * @return Response
+	 */
+	public function karmaQuerySave()
+	{
+		
+		$rules = Validator::make(Request::all(), [
+                    'accessToken' => 'required',
+                    'userId' => 'required',
+                    'subject' => 'required',
+                    'description'=> 'required',
+                    'skillTags'=>'required'
+		]);
+        if ($rules->fails()) {
+            $this->status = 'Validation fails';
+            $this->message = 'arguments missing';
+            
+        } else {
+        	$allData=Request::all();
+			$userId=$allData['userId'];
+			$subject=$allData['subject'];
+			$description=$allData['description'];
+			$skills=$allData['skillTags'];
+        	$accessToken=$allData['accessToken'];
+        	$url_subject = $subject;
+			$url_subject = strtolower($url_subject);
+		    //Make alphanumeric (removes all other characters)
+			$url_subject = preg_replace("/[^a-z0-9_\s-]/", "", $url_subject);
+			$url_subject = trim($url_subject);
+		    //Clean up multiple dashes or whitespaces
+			$url_subject = preg_replace("/[\s-]+/", " ", $url_subject);
+		    //Convert whitespaces and underscore to dash
+			$url_subject = preg_replace("/[\s_]/", "-", $url_subject);		
+			$getUser = User::where('id', '=', $userId)->where('site_token','=',$accessToken)->first();
+			if(!empty($getUser)){
+				$Question = new Question;
+				$Question ->user_id 				= $userId;
+				$Question ->subject 				= strip_tags($subject);
+				$Question ->description 			= strip_tags($description);
+				if(!empty($skills)){
+						foreach ($skills as $key => $value) {
+							$skillData[]=$value['id'];	
+						}
+						$Question ->skills 						= implode(',', $skillData);
+					}
+					else{
+						$Question ->skills 						= '';
+					}	
+				$Question ->access 					= 'public';
+				$Question ->question_url 			= strtolower($url_subject);
+				$Question->save();
+				$questionId=$Question->id;
+				$user_id_giver='null';
+				$feedType='KarmaQuery';
+				KarmaHelper::storeKarmacirclesfeed($user_id_giver,$userId,$feedType,$questionId);	
+				$user_groups=Usersgroup::where('user_id','=',$userId)->get();
+
+				if(!empty($user_groups)){
+					$user_groups=$user_groups->toArray();
+					foreach ($user_groups as $key => $value) {
+						$Groupquestion = new Groupquestion;
+						$Groupquestion->question_id = $Question->id;
+						$Groupquestion->group_id = $value['group_id'];
+						$Groupquestion->user_id = $value['user_id'];
+						$Groupquestion->save();
+					}
+				}
+				$this->status = 'Success';
+           		$this->message = 'Karma Query is saved';
+				
+			}else{
+				$this->status = 'Failure';
+           		$this->message = 'There is no such user';
+			}
+			
+	    }
+
+	    return Response::json(array('status'=>$this->status,
+    								'message'=>$this->message,
+    									
+    	));
+
+    }
+
+    /**
+	 * Function to Display offer help user.
+	 *
+	 * @return Response
+	 */
+	public function karmaQueryHelp()
+	{
+		
+		$rules = Validator::make(Request::all(), [
+                    'accessToken' => 'required',
+                    'userId' => 'required',
+                    'queryId' => 'required',
+                    
+		]);
+        if ($rules->fails()) {
+            $this->status = 'Validation fails';
+            $this->message = 'arguments missing';
+            
+        } else {
+        	$accessToken = Request::get('accessToken');
+            $userId = Request::get('userId');
+        	$queryId=Request::get('queryId');
+        	$comment=Request::get('comment');
+        	$getUser = User::where('id', '=', $userId)->where('site_token','=',$accessToken)->first();
+        	if(!empty($getUser)){
+        		$checkUser = Questionwillingtohelp::where('user_id','=',$userId)->where('question_id','=',$queryId)->count();
+        		if(empty($checkUser)){
+	      			$checkSameGiver=DB::table('questions')->where('id','=',$queryId)->where('user_id','=',$userId)->count();
+        			if($checkSameGiver < 1){
+						$questionHelp = new Questionwillingtohelp;
+						$questionHelp->question_id = $queryId;
+						$questionHelp->user_id = $userId;
+						$questionHelp->comment = $comment;
+						$questionHelp->save();
+						$feedType='OfferHelpTo';
+						KarmaHelper::storeKarmacirclesfeed($giverId,$userId,$feedType,$queryId);
+						$this->status = 'Success';
+           				$this->message = 'Your request for help is saved';
+					}else{
+						$this->status = 'Failure';
+           				$this->message = 'You cannot help your own query';
+					}
+        		}else{
+        			$this->status = 'Faliur';
+           			$this->message = 'Your have already accept this query for help';
+        		}
+        		
+			}else{
+				$this->status = 'Failure';
+           		$this->message = 'There is no such user';
+			}
+        }
+        return Response::json(array('status'=>$this->status,
+    								'message'=>$this->message,
+    									
+    	));
+    }
+
+
+}
